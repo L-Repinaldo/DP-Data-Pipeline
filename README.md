@@ -13,23 +13,23 @@ O projeto completo é composto por três sistemas independentes:
 
 1. Projeto A — Sistema de RH (OLTP)
 
-  - Geração de dados limpos, consistentes e realistas
-  
-  - Não aplica Privacidade Diferencial
+    - Geração de dados limpos, consistentes e realistas
+    
+    - Não aplica Privacidade Diferencial
 
 2. Projeto Intermediário — DP Data Pipeline (este repositório)
 
-  - Extração de dados do RH
-  
-  - Aplicação de mecanismos de Privacidade Diferencial
-  
-  - Versionamento de datasets
+    - Extração de dados do RH
+    
+    - Aplicação de mecanismos de Privacidade Diferencial
+    
+    - Versionamento de datasets
 
 3. Projeto B — Machine Learning e Ataques de Inferência
 
-  - Consumo dos datasets gerados
-  
-  - Avaliação de utilidade, vazamento e trade-offs
+    - Consumo dos datasets gerados
+    
+    - Avaliação de utilidade, vazamento e trade-offs
 
 👉 Este repositório representa exclusivamente a camada de Engenharia de Dados.
 
