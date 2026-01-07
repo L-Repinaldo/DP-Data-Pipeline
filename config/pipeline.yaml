@@ -62,24 +62,17 @@ extraction:
 
 privacy:
   sensitive_attributes:
-    salario
-        min: 1200
-        max: 120 000
-    nota_media
-        min: 0.00
-        max: 10.00
-    idade
-        min: 19
-        max: 87
-    tempo_na_empresa
-        min: 0
-        max: 68
+    salario : {min : 200 , max : 120000}
+    nota_media : {min : 0.0 , max : 10.0}
+    idade : {min : 19 , max : 87}
+    tempo_na_empresa : {min : 0 , max : 68}
+
 
 
   mechanisms:
-    - name: laplace
-      epsilons: [0.1, 0.5, 1.0, 2.0]
-      seed: 42
+    name: laplace
+    epsilons: [0.1, 0.5, 1.0, 2.0]
+    seed: 42
 
 versioning:
   output_dir: datasets
