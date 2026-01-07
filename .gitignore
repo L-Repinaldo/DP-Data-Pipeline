@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+#Arquivo para testar a aplicação localmente antes de um fluxo real bem definido.s
+test.py
