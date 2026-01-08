@@ -13,7 +13,7 @@ dp_results, metadata = dp.apply_dp(df, privacy_cfg)
 
 import datetime
 
-version_name = "v" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+version_name = "v-" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 versioning.save_version(
     baseline_df = df,

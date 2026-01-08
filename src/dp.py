@@ -14,8 +14,8 @@ def validate_privacy_config(df, privacy_cfg):
     if "sensitive_attributes" not in privacy_cfg:
         raise DPError("Configuração de privacidade sem 'sensitive_attribute'")
     
-    if "mechanisms" not in privacy_cfg:
-        raise DPError("Configuração de privacidade sem 'mechanisms'")
+    if "mechanism" not in privacy_cfg:
+        raise DPError("Configuração de privacidade sem 'mechanism'")
     
     for attr, bounds in privacy_cfg['sensitive_attributes'].items():
 
@@ -31,11 +31,11 @@ def validate_privacy_config(df, privacy_cfg):
         if bounds["min"] >= bounds["max"]:
             raise DPError(f"Bound inválido para {attr}")
 
-    mech = privacy_cfg["mechanisms"]
+    mechanism = privacy_cfg["mechanism"]
     
-    for eps in mech["epsilons"]:
-        if eps <= 0:
-            raise DPError(f"Epsilon inválido: {eps}")
+    for epsilon in mechanism["epsilons"]:
+        if epsilon <= 0:
+            raise DPError(f"Epsilon inválido: {epsilon}")
             
 
 
@@ -67,20 +67,20 @@ def apply_dp(df, privacy_cfg):
 
     results = {}
     metadata = {
-        "mechanisms": "laplace",
+        "mechanism": "laplace",
         "attributes": {},
     }
 
     sensitive_attrs = privacy_cfg["sensitive_attributes"]
 
-    mech = privacy_cfg["mechanisms"]
+    mechanism = privacy_cfg["mechanism"]
 
     
 
-    if mech['name'] != 'laplace':
-        raise DPError(f"Mecanismo não suportado: {mech['name']}")
+    if mechanism['name'] != 'laplace':
+        raise DPError(f"Mecanismo não suportado: {mechanism['name']}")
 
-    seed = mech.get("seed", 42)
+    seed = mechanism.get("seed", 42)
     rng = np.random.default_rng(seed)
 
 
@@ -92,7 +92,7 @@ def apply_dp(df, privacy_cfg):
     }
 
 
-    for eps in sorted(mech["epsilons"]):
+    for epsilon in sorted(mechanism["epsilons"]):
 
         df_dp = df.copy()
 
@@ -108,7 +108,7 @@ def apply_dp(df, privacy_cfg):
 
             noisy = laplace_mechanism(
                 clipped,
-                epsilon=eps,
+                epsilon=epsilon,
                 sensitivity=sensitivity_map[attr],
                 rng=rng
             )
@@ -125,7 +125,7 @@ def apply_dp(df, privacy_cfg):
                 "sensitivity": sensitivity_map[attr]
             }
 
-        results[eps] = df_dp
+        results[epsilon] = df_dp
 
     metadata["epsilons"] = list(results.keys())
 

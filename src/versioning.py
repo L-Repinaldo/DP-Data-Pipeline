@@ -12,13 +12,13 @@ def save_version(
     dp_results,
     metadata,
     base_dir="datasets",
-    version_name="v1"
+    version_name="v-YYYY-MM-DD_HH-MM-SS"
 ):
     """
     Salva datasets versionados no formato:
 
     datasets/
-      v1/
+      v-YYYY-MM-DD_HH-MM-SS/
         baseline.csv
         dp_eps_0.1.csv
         dp_eps_1.0.csv
