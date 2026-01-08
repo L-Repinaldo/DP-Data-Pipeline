@@ -2,176 +2,164 @@
 Camada de Engenharia de Dados para Privacidade Diferencial
 ## 📌 Visão Geral
 
-Este repositório contém o sistema intermediário de engenharia de dados do projeto IC Privacidade.
-Seu papel é realizar a extração, preparação e privatização de dados provenientes de um sistema transacional de Recursos Humanos, aplicando Privacidade Diferencial (DP) de forma controlada, versionada e reproduzível.
+Este repositório contém um pipeline de engenharia de dados responsável pela extração, preparação e aplicação de Privacidade Diferencial sobre dados provenientes de um Sistema de Recursos Humanos (RH), acessados via API.
 
-O pipeline foi projetado para isolar a aplicação da privacidade diferencial como variável experimental, garantindo clareza metodológica e separação de responsabilidades entre os sistemas envolvidos.
+Repositório do sistema base : https://github.com/L-Repinaldo/Projeto-Sistema-de-RH
+
+O objetivo do pipeline é gerar datasets versionados, contendo uma versão original (baseline) e múltiplas versões privatizadas, aplicando mecanismos de Privacidade Diferencial de forma controlada, reproduzível e rastreável.
+
+Este repositório concentra-se exclusivamente na etapa de preparação e privatização dos dados, sem assumir qualquer responsabilidade sobre o uso posterior desses datasets.
 
 ## 🏗️ Arquitetura do Projeto
 
-O projeto completo é composto por três sistemas independentes:
+O pipeline atua como uma camada intermediária de engenharia de dados, com as seguintes características:
 
-1. Projeto A — Sistema de RH (OLTP)
+  - Consome dados estruturados de um Sistema de RH (OLTP);
 
-    - Geração de dados limpos, consistentes e realistas
-    
-    - Não aplica Privacidade Diferencial
+  - Não modifica nem interfere no banco de dados de origem;
 
-2. Projeto Intermediário — DP Data Pipeline (este repositório)
+  - Executa transformações e mecanismos de privacidade de forma batch;
 
-    - Extração de dados do RH
-    
-    - Aplicação de mecanismos de Privacidade Diferencial
-    
-    - Versionamento de datasets
+  - Gera conjuntos de dados versionados como saída.
 
-3. Projeto B — Machine Learning e Ataques de Inferência
-
-    - Consumo dos datasets gerados
-    
-    - Avaliação de utilidade, vazamento e trade-offs
-
-👉 Este repositório representa exclusivamente a camada de Engenharia de Dados.
+Este repositório representa somente a camada de Engenharia de Dados, com foco na aplicação da Privacidade Diferencial.
 
 ## 🎯 Objetivo
 
-Fornecer conjuntos de dados privatizados que permitam avaliar, de forma experimental e reproduzível:
+Fornecer conjuntos de dados privatizados que permitam:
 
-  - o impacto da Privacidade Diferencial na utilidade estatística dos dados;
-  
-  - o efeito do ruído na performance de modelos de Machine Learning;
-  
-  - a resistência dos dados a ataques de inferência e reidentificação.
+  - Analisar o impacto da aplicação de Privacidade Diferencial sobre dados tabulares;
+
+  - Comparar versões do mesmo dataset sob diferentes níveis de privacidade (ε);
+
+  - Garantir reprodutibilidade e rastreabilidade do processo de privatização.
+
+O pipeline foi projetado para tornar explícitos os parâmetros, decisões e limites da aplicação de Privacidade Diferencial.
 
 ## ⚙️ Responsabilidades do Pipeline
 
 Este sistema é responsável por:
 
-  - Extrair dados estruturados do banco do sistema de RH;
-  
-  - Selecionar atributos sensíveis e não sensíveis;
-  
-  - Aplicar mecanismos de Privacidade Diferencial com parâmetros configuráveis (ε);
-  
-  - Gerar múltiplas versões do mesmo dataset (baseline e datasets privatizados);
-  
-  - Registrar metadados do processo de privatização;
-  
-  - Garantir reprodutibilidade dos experimentos.
+  - Extrair dados estruturados do banco de dados do sistema de RH;
+
+  - Realizar limpeza e seleção de atributos relevantes;
+
+  - Identificar atributos sensíveis e não sensíveis;
+
+  - Aplicar mecanismos de Privacidade Diferencial com parâmetros configuráveis;
+
+  - Gerar múltiplas versões do mesmo dataset (baseline e versões privatizadas);
+
+  - Registrar metadados completos do processo de privatização;
+
+  - Garantir execução determinística e reprodutível.
 
 ❌ O pipeline não:
 
-  - treina modelos de Machine Learning;
-  
-  - executa ataques de inferência;
-  
-  - altera o banco de dados de origem.
+  - Altera o banco de dados de origem;
+
+  - Executa processamento em tempo real;
+
+  - Realiza análises estatísticas ou modelagem sobre os dados.
 
 ## 🔐 Privacidade Diferencial
 
-A Privacidade Diferencial é aplicada como etapa de preparação de dados, antes do uso em Machine Learning.
+A Privacidade Diferencial é aplicada como uma etapa explícita do pipeline de preparação de dados.
 
-Mecanismos avaliados podem incluir:
+Atualmente, o pipeline suporta:
 
-  - Laplace Mechanism
-  
-  - Gaussian Mechanism
-  
-  - Perturbação de atributos e/ou labels
+  - Laplace Mechanism aplicado a atributos numéricos;
 
-Cada execução registra explicitamente:
+  - Clipping obrigatório baseado em limites definidos em configuração;
 
-  - o mecanismo utilizado;
-  
-  - os valores de ε;
-  
-  - a versão do dataset gerado.
+  - Sensibilidade controlada por atributo;
+
+  - Execução determinística via uso de seed fixa.
+
+Cada execução registra de forma explícita:
+
+  - O mecanismo de privacidade utilizado;
+
+  - Os valores de ε aplicados;
+
+  - Os limites e sensibilidades por atributo.
 
 ## 🗂️ Versionamento de Dados
 
-Os datasets são versionados por execução, permitindo comparações entre diferentes estados do sistema de origem.
+Os datasets gerados são versionados por execução do pipeline.
 
 Exemplo de estrutura:
 
-    datasets/
-     ├── v1/
-     │    ├── baseline.csv
-     │    ├── dp_eps_0.1.csv
-     │    └── dp_eps_1.0.csv
-     ├── v2/
-     │    ├── baseline.csv
-     │    ├── dp_eps_0.1.csv
-     │    └── dp_eps_1.0.csv
+      datasets/
+      └── v-YYYY-MM-DD_HH-MM-SS/
+            ├── baseline.csv
+            ├── dp_eps_0.1.csv
+            ├── dp_eps_1.0.csv
+            └── metadata.json
 
 
 Cada versão representa:
 
-  - um estado específico do banco do RH;
-  
-  - um conjunto fechado e comparável de experimentos.
+  - Um estado específico dos dados extraídos do sistema de RH;
+
+  - Um conjunto fechado e comparável de datasets;
+
+  - Um registro completo dos parâmetros utilizados.
 
 ## 📥 Entrada e 📤 Saída de Dados
 
 Entrada
 
-Dados estruturados provenientes do sistema de RH:
-  
-  - funcionários
-  
-  - setores
-  
-  - avaliações
-  
-  - benefícios
+Dados estruturados provenientes do Sistema de RH, incluindo, por exemplo:
+
+  - Funcionários;
+
+  - Setores;
+
+  - Cargos;
+
+  - Benefícios_Funcionários;
+
+  - Avaliações;
+
+  - Benefícios.
 
 Saída
-  
-  - Dataset original (baseline);
-  
-  - Datasets privatizados por nível de ε;
-  
-  - Metadados da execução (parâmetros, data, versão).
 
+  - Dataset original (baseline);
+
+  - Datasets privatizados por nível de ε;
+
+Metadados da execução (parâmetros, mecanismo, versão).
 ## ▶️ Execução
 
 O pipeline é executado de forma batch e sob demanda.
 
-  - Não há execução contínua;
-  
-  - Não há dependência em tempo real entre os sistemas.
+  - Não há execução automática ou contínua;
 
-Mudanças no sistema de RH não afetam automaticamente os experimentos de ML.
-Uma nova versão de dataset só é criada quando o pipeline é explicitamente executado.
+  - Uma nova versão de dataset só é criada quando o pipeline é explicitamente executado;
 
-🤖 Relação com o Projeto de Machine Learning
-
-O Projeto B consome explicitamente uma versão definida dos datasets gerados por este pipeline.
-
-Isso garante que os experimentos sejam:
-
-  - reproduzíveis;
-  
-  - comparáveis;
-  
-  - independentes da evolução do sistema de origem.
+  - Mudanças no sistema de RH não afetam versões já geradas.
 
 ## 🎓 Motivação Acadêmica
 
-A separação da camada de Privacidade Diferencial em um sistema independente permite:
+A separação da aplicação de Privacidade Diferencial em um pipeline independente permite:
 
-  - isolamento da variável experimental;
-  
-  - rigor metodológico;
-  
-  - alinhamento com boas práticas de engenharia de dados e pesquisa científica.
+  - Isolamento claro da etapa de privatização;
+
+  - Rigor metodológico;
+
+  - Transparência no processo de geração dos dados;
+
+  - Alinhamento com boas práticas de engenharia de dados e pesquisa acadêmica.
 
 ## ℹ️ Observações
 
   - Os dados utilizados são simulados e não representam indivíduos reais;
-  
-  - Este projeto é desenvolvido para fins acadêmicos e de pesquisa;
-  
-  - O foco está em clareza experimental, não em conveniência de execução imediata.
+
+  - Este projeto possui finalidade acadêmica e experimental;
+
+  - O foco está em clareza, reprodutibilidade e controle do processo.
 
 ## 📜 Licença
 
@@ -179,7 +167,6 @@ Uso acadêmico e educacional.
 
 ## Nota Final
 
-Este repositório não existe para “facilitar” o Machine Learning,
-ele existe para tornar o experimento correto, reproduzível e defensável.
+Este repositório existe para tornar explícita, controlável e defensável a aplicação de Privacidade Diferencial sobre dados de RH.
 
-Isso é intencional.
+Nada mais. Nada a menos.
