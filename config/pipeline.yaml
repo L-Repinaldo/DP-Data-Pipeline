@@ -62,7 +62,7 @@ extraction:
 
 privacy:
   sensitive_attributes:
-    salario : {min : 200 , max : 120000}
+    salario : {min : 1200 , max : 20000}
     nota_media : {min : 0.0 , max : 10.0}
     idade : {min : 19 , max : 87}
     tempo_na_empresa : {min : 0 , max : 68}
