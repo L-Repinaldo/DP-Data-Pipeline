@@ -1,4 +1,4 @@
-from src import extract, transform, dp, versioning
+from src import diferential_privacy, extract, transform, versioning
 import yaml
 
 with open("config/pipeline.yaml") as f:
@@ -9,7 +9,7 @@ privacy_cfg = cfg["privacy"]
 data = extract.data_extraction()
 df, info = transform.transform(data)
 
-dp_results, metadata = dp.apply_dp(df, privacy_cfg)
+dp_results, metadata = diferential_privacy.apply_dp(df, privacy_cfg)
 
 import datetime
 

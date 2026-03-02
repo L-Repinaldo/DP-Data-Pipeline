@@ -55,6 +55,13 @@ def laplace_mechanism(series, epsilon, sensitivity, rng):
     return series + noise
 
 
+def compute_sensitivity_from_bounds(bounds):
+    """
+    Sensibilidade global: Δf = max - min
+    """
+    return bounds["max"] - bounds["min"]
+
+
 def apply_dp(df, privacy_cfg):
     """
     Retorna:
@@ -84,14 +91,6 @@ def apply_dp(df, privacy_cfg):
     rng = np.random.default_rng(seed)
 
 
-    sensitivity_map = {
-        "salario": 1000,
-        "nota_media": 1.0,
-        "idade": 1,
-        "tempo_na_empresa": 1,
-    }
-
-
     for epsilon in sorted(mechanism["epsilons"]):
 
         df_dp = df.copy()
@@ -106,10 +105,12 @@ def apply_dp(df, privacy_cfg):
                 bounds["max"]
             )
 
+            sensitivity = compute_sensitivity_from_bounds(bounds)
+
             noisy = laplace_mechanism(
                 clipped,
                 epsilon=epsilon,
-                sensitivity=sensitivity_map[attr],
+                sensitivity=sensitivity,
                 rng=rng
             )
 
@@ -122,7 +123,7 @@ def apply_dp(df, privacy_cfg):
             metadata["attributes"][attr] = {
                 "min": bounds["min"],
                 "max": bounds["max"],
-                "sensitivity": sensitivity_map[attr]
+                "sensitivity": sensitivity
             }
 
         results[epsilon] = df_dp
