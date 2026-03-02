@@ -130,6 +130,10 @@ Saída
 
   - Datasets privatizados por nível de ε;
 
+  - Colunas tabela output:
+    
+          salario|idade|tempo_na_empresa|nota_media|qtd_beneficios|cargo|setor       
+
 Metadados da execução (parâmetros, mecanismo, versão).
 ## ▶️ Execução
 
