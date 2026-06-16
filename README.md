@@ -1,176 +1,104 @@
-# DP-Data-Pipeline
-Camada de Engenharia de Dados para Privacidade Diferencial
-## 📌 Visão Geral
+ # DP-Data-Pipeline
 
-Este repositório contém um pipeline de engenharia de dados responsável pela extração, preparação e aplicação de Privacidade Diferencial sobre dados provenientes de um Sistema de Recursos Humanos (RH), acessados via API.
+ Camada de preparação e aplicação de Privacidade Diferencial para o experimento
 
-Repositório do sistema base : https://github.com/L-Repinaldo/Projeto-Sistema-de-RH
+ ## Objetivo do Projeto
 
-O objetivo do pipeline é gerar datasets versionados, contendo uma versão original (baseline) e múltiplas versões privatizadas, aplicando mecanismos de Privacidade Diferencial de forma controlada, reproduzível e rastreável.
+ Este repositório implementa a etapa de Privacidade Diferencial do experimento. Sua responsabilidade é receber dados tabulares sintéticos gerados pelo Sistema de RH, executar limpeza e transformação, aplicar mecanismos de privacidade configuráveis e produzir versões versionadas dos datasets para consumo pelo pipeline experimental de Machine Learning e testes de Membership Inference Attack.
 
-Este repositório concentra-se exclusivamente na etapa de preparação e privatização dos dados, sem assumir qualquer responsabilidade sobre o uso posterior desses datasets.
+ Em particular, o projeto resolve o problema de produzir datasets privatizados de forma reprodutível e rastreável, permitindo comparar impacto de diferentes valores de ε sobre a utilidade dos dados.
 
-## 🏗️ Arquitetura do Projeto
+ ## Arquitetura Geral
 
-O pipeline atua como uma camada intermediária de engenharia de dados, com as seguintes características:
+ Principais componentes (módulos):
 
-  - Consome dados estruturados de um Sistema de RH (OLTP);
+ - `src/extract.py` — conecta ao banco PostgreSQL e extrai as tabelas configuradas em `config/pipeline.yaml` como DataFrames Pandas.
+ - `src/transform.py` — prepara os dados tabulares: cálculo de `idade` e `tempo_na_empresa`, agregação de avaliações (`nota_media`), contagem de benefícios (`qtd_beneficios`), merges com dimensões (`cargo`, `setor`), preenchimento de NA e tipagem.
+ - `src/diferential_privacy.py` — camada de privatização. Implementa aplicação do mecanismo Laplace (via `diffprivlib`) aos atributos sensíveis definidos em configuração. Mantém compatibilidade de formato e registra metadados importantes (mecanismo, atributos, epsilons, seed).
+ - `src/versioning.py` — persiste os arquivos gerados por execução em `datasets/v-YYYY-MM-DD_HH-MM-SS/`, incluindo `baseline.csv`, `dp_eps_{epsilon}.csv` e `metadata.json`.
+ - `config/pipeline.yaml` — arquivo de configuração principal: fontes de dados, colunas esperadas, atributos sensíveis (bounds), mecanismo e lista de epsilons.
 
-  - Não modifica nem interfere no banco de dados de origem;
+ Cada módulo tem responsabilidade bem definida e o fluxo é implementado por `run_pipeline.py`.
 
-  - Executa transformações e mecanismos de privacidade de forma batch;
+ ## Papel na Arquitetura do Experimento
 
-  - Gera conjuntos de dados versionados como saída.
+ - Sistema de RH Sintético: gera os dados originais (fora deste repositório).
+ - DP Data Pipeline (este repositório): realiza extração, transformação, aplicação de Privacidade Diferencial e versionamento dos datasets.
+ - Pipeline Experimental de Machine Learning: consome os CSVs gerados (baseline e versões privatizadas) para treinar modelos e executar avaliações, incluindo ataques de Membership Inference.
 
-Este repositório representa somente a camada de Engenharia de Dados, com foco na aplicação da Privacidade Diferencial.
+ Este repositório corresponde estritamente à etapa de privatização e não realiza treino ou avaliação de modelos.
 
-## 🎯 Objetivo
+ ## Fluxo Completo dos Dados
 
-Fornecer conjuntos de dados privatizados que permitam:
+ ```text
+ PostgreSQL
+    ↓
+ src/extract.py (extração de tabelas como DataFrames)
+    ↓
+ src/transform.py (limpeza, agregações e tipagem)
+    ↓
+ src/diferential_privacy.py (aplica mecanismo Laplace por atributo sensível)
+    ↓
+ src/versioning.py (salva baseline, dp_eps_*.csv e metadata.json)
+    ↓
+ datasets/ (versões geradas)
+ ```
 
-  - Analisar o impacto da aplicação de Privacidade Diferencial sobre dados tabulares;
+ ## Formato de Entrada e Saída
 
-  - Comparar versões do mesmo dataset sob diferentes níveis de privacidade (ε);
+ - Entrada: tabelas SQL conforme `config/pipeline.yaml` (`funcionarios`, `avaliacoes`, `beneficios`, `beneficio_funcionario`, `setores`, `cargos`). O módulo `extract` retorna um dicionário de DataFrames.
+ - Saída: em cada execução é criado um diretório `datasets/v-YYYY-MM-DD_HH-MM-SS/` com:
+   - `baseline.csv` — dataset pós-transformação sem ruído;
+   - `dp_eps_{epsilon}.csv` — uma versão por cada ε configurado (ex.: `0.1`, `0.5`, `1.0`, `2.0`);
+   - `metadata.json` — descreve `mechanism`, `attributes` (min/max/sensitivity), `epsilons` e `seed` usado para reprodutibilidade.
 
-  - Garantir reprodutibilidade e rastreabilidade do processo de privatização.
+ As colunas do dataset de saída (exemplo): `salario, idade, tempo_na_empresa, nota_media, qtd_beneficios, cargo, setor`.
 
-O pipeline foi projetado para tornar explícitos os parâmetros, decisões e limites da aplicação de Privacidade Diferencial.
+ ## Detalhes de Privacidade
 
-## ⚙️ Responsabilidades do Pipeline
+ - Mecanismo: Laplace (implementado com `diffprivlib`).
+ - Atributos sensíveis: definidos em `config/pipeline.yaml` com bounds (min/max) — atualmente `salario`, `nota_media`, `idade`, `tempo_na_empresa`.
+ - Sensibilidade: no código atual cada atributo usa `sensitivity = max - min` quando aplicado por-valor; a escolha de sensibilidade e a estratégia (por-valor vs. por-consulta) estão documentadas no código e no `README` para análise crítica.
+ - Reprodutibilidade: a seed do mecanismo é lida de `config/pipeline.yaml` (`privacy.mechanism.seed`) ou adotada um valor padrão (42). A seed é registrada em `metadata.json` e passada ao mecanismo para garantir que execuções com a mesma configuração gerem os mesmos arquivos privatizados.
 
-Este sistema é responsável por:
+ ## Execução
 
-  - Extrair dados estruturados do banco de dados do sistema de RH;
+ 1. Instale dependências (recomendado em virtualenv):
 
-  - Realizar limpeza e seleção de atributos relevantes;
+ ```bash
+ python -m pip install -r requirements.txt
+ ```
 
-  - Identificar atributos sensíveis e não sensíveis;
+ 2. Configure variáveis de ambiente para acesso ao PostgreSQL (ou use uma cópia local dos dados para desenvolvimento). O `extract` usa `python-dotenv` para carregar variáveis se um arquivo `.env` estiver presente.
 
-  - Aplicar mecanismos de Privacidade Diferencial com parâmetros configuráveis;
+ 3. Ajuste `config/pipeline.yaml` conforme necessário (tabelas, bounds, epsilons, seed).
 
-  - Gerar múltiplas versões do mesmo dataset (baseline e versões privatizadas);
+ 4. Execute o pipeline:
 
-  - Registrar metadados completos do processo de privatização;
+ ```bash
+ python run_pipeline.py
+ ```
 
-  - Garantir execução determinística e reprodutível.
+ Ao final, um diretório em `datasets/` conterá o `baseline.csv`, os `dp_eps_*.csv` e o `metadata.json` com os parâmetros e a seed utilizada.
 
-❌ O pipeline não:
+ ## Observações e Boas Práticas
 
-  - Altera o banco de dados de origem;
+ - Este repositório implementa mecanismos experimentais para pesquisa. A aplicação direta desses datasets em produção exige revisão de contabilidade de privacidade (composição de ε), justificativa formal de sensitivities e auditoria.
+ - Para reproduzir resultados exatos, mantenha `config/pipeline.yaml` e as variáveis de ambiente inalteradas entre execuções (a seed garante reprodutibilidade do ruído).
+ - O pipeline atual aplica ruído por registro a atributos sensíveis. Dependendo do objetivo (liberar estatísticas agregadas versus datasets por registro) recomenda-se reavaliar a estratégia de sensibilidades e a forma de liberação (agregados, sintetizadores, shift controlado, etc.).
 
-  - Executa processamento em tempo real;
+ ## Estrutura do Repositório
 
-  - Realiza análises estatísticas ou modelagem sobre os dados.
+ - `run_pipeline.py` — orquestrador de execução;
+ - `config/pipeline.yaml` — configuração principal do pipeline;
+ - `src/extract.py` — extração de dados do banco;
+ - `src/transform.py` — transformação e limpeza;
+ - `src/diferential_privacy.py` — aplicação do mecanismo Laplace e geração de datasets DP;
+ - `src/versioning.py` — persistência/versionamento dos datasets;
+ - `datasets/` — saída gerada por execução (versões historicamente armazenadas);
+ - `requirements.txt` — dependências do projeto.
 
-## 🔐 Privacidade Diferencial
+ ## Licença
 
-A Privacidade Diferencial é aplicada como uma etapa explícita do pipeline de preparação de dados.
+ Uso acadêmico e educacional.
 
-Atualmente, o pipeline suporta:
-
-  - Laplace Mechanism aplicado a atributos numéricos;
-
-  - Clipping obrigatório baseado em limites definidos em configuração;
-
-  - Sensibilidade controlada por atributo;
-
-  - Execução determinística via uso de seed fixa.
-
-Cada execução registra de forma explícita:
-
-  - O mecanismo de privacidade utilizado;
-
-  - Os valores de ε aplicados;
-
-  - Os limites e sensibilidades por atributo.
-
-## 🗂️ Versionamento de Dados
-
-Os datasets gerados são versionados por execução do pipeline.
-
-Exemplo de estrutura:
-
-      datasets/
-      └── v-YYYY-MM-DD_HH-MM-SS/
-            ├── baseline.csv
-            ├── dp_eps_0.1.csv
-            ├── dp_eps_1.0.csv
-            └── metadata.json
-
-
-Cada versão representa:
-
-  - Um estado específico dos dados extraídos do sistema de RH;
-
-  - Um conjunto fechado e comparável de datasets;
-
-  - Um registro completo dos parâmetros utilizados.
-
-## 📥 Entrada e 📤 Saída de Dados
-
-Entrada
-
-Dados estruturados provenientes do Sistema de RH, incluindo, por exemplo:
-
-  - Funcionários;
-
-  - Setores;
-
-  - Cargos;
-
-  - Benefícios_Funcionários;
-
-  - Avaliações;
-
-  - Benefícios.
-
-Saída
-
-  - Dataset original (baseline);
-
-  - Datasets privatizados por nível de ε;
-
-  - Colunas tabela output:
-    
-          | salario | idade | tempo_na_empresa | nota_media | qtd_beneficios | cargo | setor |       
-
-Metadados da execução (parâmetros, mecanismo, versão).
-## ▶️ Execução
-
-O pipeline é executado de forma batch e sob demanda.
-
-  - Não há execução automática ou contínua;
-
-  - Uma nova versão de dataset só é criada quando o pipeline é explicitamente executado;
-
-  - Mudanças no sistema de RH não afetam versões já geradas.
-
-## 🎓 Motivação Acadêmica
-
-A separação da aplicação de Privacidade Diferencial em um pipeline independente permite:
-
-  - Isolamento claro da etapa de privatização;
-
-  - Rigor metodológico;
-
-  - Transparência no processo de geração dos dados;
-
-  - Alinhamento com boas práticas de engenharia de dados e pesquisa acadêmica.
-
-## ℹ️ Observações
-
-  - Os dados utilizados são simulados e não representam indivíduos reais;
-
-  - Este projeto possui finalidade acadêmica e experimental;
-
-  - O foco está em clareza, reprodutibilidade e controle do processo.
-
-## 📜 Licença
-
-Uso acadêmico e educacional.
-
-## Nota Final
-
-Este repositório existe para tornar explícita, controlável e defensável a aplicação de Privacidade Diferencial sobre dados de RH.
-
-Nada mais. Nada a menos.

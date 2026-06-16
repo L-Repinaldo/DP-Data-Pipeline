@@ -6,3 +6,4 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 jsonschema==4.25.0
 jsonschema-specifications==2025.4.1
+diffprivlib
