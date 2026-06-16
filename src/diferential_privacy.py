@@ -1,132 +1,149 @@
 import pandas as pd
 import numpy as np
 
+from diffprivlib.mechanisms import Laplace
+
+
 class DPError(Exception):
     pass
 
 
 def validate_privacy_config(df, privacy_cfg):
-    """
-    - verifica se colunas existem
-    - verifica bounds
-    - garante tipos numéricos
-    """
+
     if "sensitive_attributes" not in privacy_cfg:
-        raise DPError("Configuração de privacidade sem 'sensitive_attribute'")
-    
+        raise DPError(
+            "Configuração de privacidade sem 'sensitive_attributes'"
+        )
+
     if "mechanism" not in privacy_cfg:
-        raise DPError("Configuração de privacidade sem 'mechanism'")
-    
-    for attr, bounds in privacy_cfg['sensitive_attributes'].items():
+        raise DPError(
+            "Configuração de privacidade sem 'mechanism'"
+        )
+
+    for attr, bounds in privacy_cfg["sensitive_attributes"].items():
 
         if attr not in df.columns:
-            raise DPError(f"Atributo sensível ausente no dataset: {attr}")
+            raise DPError(
+                f"Atributo sensível ausente no dataset: {attr}"
+            )
 
         if not pd.api.types.is_numeric_dtype(df[attr]):
-            raise DPError(f"Atributo não numérico: {attr}")
+            raise DPError(
+                f"Atributo não numérico: {attr}"
+            )
 
         if "min" not in bounds or "max" not in bounds:
-            raise DPError(f"Bounds incompletos para {attr}")
+            raise DPError(
+                f"Bounds incompletos para {attr}"
+            )
 
         if bounds["min"] >= bounds["max"]:
-            raise DPError(f"Bound inválido para {attr}")
+            raise DPError(
+                f"Bounds inválidos para {attr}"
+            )
 
-    mechanism = privacy_cfg["mechanism"]
-    
-    for epsilon in mechanism["epsilons"]:
+    epsilons = privacy_cfg["mechanism"].get("epsilons", [])
+
+    for epsilon in epsilons:
         if epsilon <= 0:
-            raise DPError(f"Epsilon inválido: {epsilon}")
-            
+            raise DPError(
+                f"Epsilon inválido: {epsilon}"
+            )
 
 
-def clip_series(series, min_val, max_val):
-    """
-    Hard clipping obrigatório
-    """
-    return series.clip(lower=min_val, upper=max_val)
+def clip_series(series, min_value, max_value):
+
+    return series.clip(
+        lower=min_value,
+        upper=max_value
+    )
 
 
-def laplace_mechanism(series, epsilon, sensitivity, rng):
+def apply_laplace_noise(value, epsilon, sensitivity, rng=None):
     """
-    Aplica ruído Laplace
+    Aplica ruído Laplace usando um RNG fornecido para reprodutibilidade.
+
+    `rng` deve ser um objeto compatível com NumPy (Generator/RandomState) ou um int.
     """
-    scale = sensitivity / epsilon
-    noise = rng.laplace(loc=0.0, scale=scale, size=len(series))
-    return series + noise
+
+    mechanism = Laplace(
+        epsilon=epsilon,
+        sensitivity=sensitivity,
+        random_state=rng,
+    )
+
+    return mechanism.randomise(value)
 
 
 def apply_dp(df, privacy_cfg):
     """
-    Retorna:
-    {
-    epsilon: df_dp
-    },
-    metadata
+    Aplica Privacidade Diferencial linha a linha.
+
+    Cada atributo sensível recebe ruído Laplace
+    individualmente mantendo:
+    - mesma estrutura do dataset;
+    - mesmas colunas;
+    - diferentes versões por epsilon.
     """
+
     validate_privacy_config(df, privacy_cfg)
 
     results = {}
+
     metadata = {
         "mechanism": "laplace",
-        "attributes": {},
+        "attributes": {}
     }
 
-    sensitive_attrs = privacy_cfg["sensitive_attributes"]
+    sensitive_attributes = privacy_cfg["sensitive_attributes"]
+    mechanism_cfg = privacy_cfg["mechanism"]
 
-    mechanism = privacy_cfg["mechanism"]
+    if mechanism_cfg["name"] != "laplace":
+        raise DPError(
+            f"Mecanismo não suportado: {mechanism_cfg['name']}"
+        )
 
-    
+    for attr, bounds in sensitive_attributes.items():
 
-    if mechanism['name'] != 'laplace':
-        raise DPError(f"Mecanismo não suportado: {mechanism['name']}")
+        sensitivity = bounds["max"] - bounds["min"]
 
-    seed = mechanism.get("seed", 42)
-    rng = np.random.default_rng(seed)
+        metadata["attributes"][attr] = {
+            "min": bounds["min"],
+            "max": bounds["max"],
+            "sensitivity": sensitivity
+        }
 
+    epsilons = sorted(
+        mechanism_cfg["epsilons"]
+    )
 
-    sensitivity_map = {
-        "salario": 1000,
-        "nota_media": 1.0,
-        "idade": 1,
-        "tempo_na_empresa": 1,
-    }
+    # Seed / RNG para reprodutibilidade: usar seed configurada ou default 42
+    seed = mechanism_cfg.get("seed", 42)
+    # diffprivlib expects a RandomState-like object or an int; use RandomState
+    rng = np.random.RandomState(seed)
 
+    # registrar a seed nos metadados (adiciona campo sem remover os existentes)
+    metadata["seed"] = seed
 
-    for epsilon in sorted(mechanism["epsilons"]):
-
+    for epsilon in epsilons:
         df_dp = df.copy()
 
-        for attr in sorted(sensitive_attrs):
+        for attr, bounds in sensitive_attributes.items():
+            sensitivity = bounds["max"] - bounds["min"]
 
-            bounds = sensitive_attrs[attr]
-
-            clipped = clip_series(
-                df_dp[attr],
-                bounds["min"],
-                bounds["max"]
+            df_dp[attr] = df_dp[attr].apply(
+                lambda value: apply_laplace_noise(
+                    value=value,
+                    epsilon=epsilon,
+                    sensitivity=sensitivity,
+                    rng=rng,
+                )
             )
 
-            noisy = laplace_mechanism(
-                clipped,
-                epsilon=epsilon,
-                sensitivity=sensitivity_map[attr],
-                rng=rng
-            )
-
-            df_dp[attr] = clip_series(
-                noisy,
-                bounds["min"],
-                bounds["max"]
-            )
-
-            metadata["attributes"][attr] = {
-                "min": bounds["min"],
-                "max": bounds["max"],
-                "sensitivity": sensitivity_map[attr]
-            }
+            df_dp[attr] = clip_series(df_dp[attr], bounds["min"], bounds["max"])
 
         results[epsilon] = df_dp
 
-    metadata["epsilons"] = list(results.keys())
+    metadata["epsilons"] = epsilons
 
     return results, metadata
