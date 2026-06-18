@@ -136,14 +136,5 @@ def transform(dataframes: dict) -> tuple[pd.DataFrame, dict]:
         "nota_media",
         "tempo_na_empresa",
     ]
-
-    schema_info = {
-        "columns": list(df.columns),
-        "sensitive_attributes": sensitive_attributes,
-        "non_sensitive_attributes": [
-            c for c in df.columns if c not in sensitive_attributes
-        ],
-        "row_count": len(df),
-    }
-
-    return df, schema_info
+    
+    return df
